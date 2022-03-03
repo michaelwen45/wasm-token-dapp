@@ -5,4 +5,4 @@ dist = "dist"
 [[hooks]]
 stage = "build"
 command = "node"
-command_arguments = ["node_modules/tailwindcss/lib/cli", "-i", "index.css",  "-o",  "dist/.stage/index.css", "--minify"]
+command_arguments = ["node_modules/tailwindcss/lib/cli", "-i", "index.css",  "-o",  "dist/.stage/index.css"]
