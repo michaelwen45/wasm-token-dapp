@@ -1,10 +1,14 @@
+use crate::store::{reducer, Action, Files, FilesVec};
 use sycamore::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::{Event, HtmlInputElement};
 
 #[component]
-pub fn FilesUploader<G: Html>(ctx: ScopeRef) -> View<G> {
-    let file_list = ctx.create_signal(Vec::<gloo_file::File>::new());
+pub fn FilesSelector<G: Html>(ctx: ScopeRef) -> View<G> {
+    let files = ctx.use_context::<Signal<Files>>();
+    let files_vec = ctx.use_context::<Signal<FilesVec>>();
+    log::debug!("{:?}", files_vec.get());
+
     view! {ctx,
         div(class="space-y-4") {
             label(for="file-upload", class="px-5 py-3 rounded-lg shadow-lg bg-indigo-700 hover:bg-indigo-600 active:bg-indigo-800
@@ -14,9 +18,9 @@ pub fn FilesUploader<G: Html>(ctx: ScopeRef) -> View<G> {
                     input(id="file-upload", class="hidden", type="file", multiple=true, on:change={
                         |event: Event| {
                             let target: HtmlInputElement = event.target().unwrap().unchecked_into();
-                            if let Some(files) = target.files() {
-                                file_list.set((0..files.length()).map(|i|gloo_file::File::from(files.get(i).unwrap())).collect());
-                                log::debug!("{:?}", file_list.get());
+                            if let Some(file_list) = target.files() {
+                                reducer(ctx, Action::FilesSet(file_list));
+                                log::debug!("{:?}", files.get().0);
 
                                 // let files = js_sys::try_iter(files).map(|file| ;
                                 // wasm_bindgen_futures::spawn_local(async move {
@@ -40,7 +44,7 @@ pub fn FilesUploader<G: Html>(ctx: ScopeRef) -> View<G> {
                     }
                     tbody {
                         Indexed {
-                            iterable: file_list,
+                            iterable: files_vec,
                             view: |ctx, f| {
                                 let name = f.name();
                                 let size = f.size();
