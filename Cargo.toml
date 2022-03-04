@@ -24,7 +24,7 @@ serde = { version = "1.0.136", features = [] }
 thiserror = "1.0.30"
 
 [dependencies.web-sys]
-features = ["Event", "File", "FileReader", "Blob"]
+features = ["Event", "File", "FileReader", "Blob", "Window"]
 version = "0.3.56"
 
 [dependencies.js-sys]

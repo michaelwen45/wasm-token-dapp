@@ -1,8 +1,8 @@
 use crate::error::Error;
-use crate::transaction::{Base64, DeepHashItem};
+use crate::transaction::Base64;
 use jsonwebkey::JsonWebKey;
 use ring::{
-    digest::{Context, SHA256, SHA384},
+    digest::{Context, SHA256},
     rand::{self, SecureRandom},
     signature::{self, KeyPair, RsaKeyPair},
 };
@@ -60,76 +60,6 @@ impl Provider {
             .verify(message, signature)
             .map_err(|_| Error::InvalidHash)?;
         Ok(())
-    }
-
-    pub fn hash_sha256(&self, message: &[u8]) -> Result<[u8; 32], Error> {
-        let mut context = Context::new(&SHA256);
-        context.update(message);
-        let mut result: [u8; 32] = [0; 32];
-        result.copy_from_slice(context.finish().as_ref());
-        Ok(result)
-    }
-
-    fn hash_sha384(&self, message: &[u8]) -> Result<[u8; 48], Error> {
-        let mut context = Context::new(&SHA384);
-        context.update(message);
-        let mut result: [u8; 48] = [0; 48];
-        result.copy_from_slice(context.finish().as_ref());
-        Ok(result)
-    }
-
-    /// Returns a SHA256 hash of the the concatenated SHA256 hashes of a vector of messages.
-    pub fn hash_all_sha256(&self, messages: Vec<&[u8]>) -> Result<[u8; 32], Error> {
-        let hash: Vec<u8> = messages
-            .into_iter()
-            .map(|m| self.hash_sha256(m).unwrap())
-            .into_iter()
-            .flatten()
-            .collect();
-        let hash = self.hash_sha256(&hash)?;
-        Ok(hash)
-    }
-
-    /// Returns a SHA384 hash of the the concatenated SHA384 hashes of a vector messages.
-    fn hash_all_sha384(&self, messages: Vec<&[u8]>) -> Result<[u8; 48], Error> {
-        let hash: Vec<u8> = messages
-            .into_iter()
-            .map(|m| self.hash_sha384(m).unwrap())
-            .into_iter()
-            .flatten()
-            .collect();
-        let hash = self.hash_sha384(&hash)?;
-        Ok(hash)
-    }
-
-    /// Concatenates two `[u8; 48]` arrays, returning a `[u8; 96]` array.
-    fn concat_u8_48(&self, left: [u8; 48], right: [u8; 48]) -> Result<[u8; 96], Error> {
-        let mut iter = left.into_iter().chain(right);
-        let result = [(); 96].map(|_| iter.next().unwrap());
-        Ok(result)
-    }
-
-    /// Calculates data root of transaction in accordance with implementation in [arweave-js](https://github.com/ArweaveTeam/arweave-js/blob/master/src/common/lib/deepHash.ts).
-    /// [`DeepHashItem`] is a recursive Enum that allows the function to be applied to
-    /// nested [`Vec<u8>`] of arbitrary depth.
-    pub fn deep_hash(&self, deep_hash_item: DeepHashItem) -> Result<[u8; 48], Error> {
-        let hash = match deep_hash_item {
-            DeepHashItem::Blob(blob) => {
-                let blob_tag = format!("blob{}", blob.len());
-                self.hash_all_sha384(vec![blob_tag.as_bytes(), &blob])?
-            }
-            DeepHashItem::List(list) => {
-                let list_tag = format!("list{}", list.len());
-                let mut hash = self.hash_sha384(list_tag.as_bytes())?;
-
-                for child in list.into_iter() {
-                    let child_hash = self.deep_hash(child)?;
-                    hash = self.hash_sha384(&self.concat_u8_48(hash, child_hash)?)?;
-                }
-                hash
-            }
-        };
-        Ok(hash)
     }
 
     pub fn fill_rand(&self, dest: &mut [u8]) -> Result<(), Error> {

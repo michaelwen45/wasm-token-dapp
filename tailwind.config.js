@@ -1,6 +1,7 @@
 module.exports = {
     mode: 'jit',
     purge: [
-        "./src/**/*.rs"
+        "./src/**/*.rs",
+        "*.html"
     ],
 }

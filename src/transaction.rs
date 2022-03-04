@@ -306,9 +306,9 @@ impl Uploader {
     }
 }
 
-pub fn merklize(data: Vec<u8>, crypto: &Provider) -> Result<Transaction, Error> {
-    let mut chunks = generate_leaves(data.clone(), crypto)?;
-    let root = generate_data_root(chunks.clone(), crypto)?;
+pub fn merklize(data: Vec<u8>) -> Result<Transaction, Error> {
+    let mut chunks = generate_leaves(data.clone())?;
+    let root = generate_data_root(chunks.clone())?;
     let data_root = Base64(root.id.clone().into_iter().collect());
     let mut proofs = resolve_proofs(root, None)?;
 

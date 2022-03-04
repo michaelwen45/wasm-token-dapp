@@ -1,7 +1,8 @@
 //! Functionality for chunking file data and calculating and verifying root ids.
 
-use crate::{crypto::Provider, error::Error};
+use crate::{crypto::Provider, error::Error, transaction::DeepHashItem};
 use borsh::BorshDeserialize;
+use ring::digest::{Context, SHA256, SHA384};
 
 /// Single struct used for original data chunks (Leaves) and branch nodes (hashes of pairs of child nodes).
 #[derive(Debug, PartialEq, Clone)]
@@ -88,7 +89,7 @@ impl Helpers<u32> for u32 {
 }
 
 /// Generates data chunks from which the calculation of root id starts.
-pub fn generate_leaves(data: Vec<u8>, crypto: &Provider) -> Result<Vec<Node>, Error> {
+pub fn generate_leaves(data: Vec<u8>) -> Result<Vec<Node>, Error> {
     let mut data_chunks: Vec<&[u8]> = data.chunks(MAX_CHUNK_SIZE).collect();
 
     #[allow(unused_assignments)]
@@ -107,10 +108,10 @@ pub fn generate_leaves(data: Vec<u8>, crypto: &Provider) -> Result<Vec<Node>, Er
     let mut leaves = Vec::<Node>::new();
     let mut min_byte_range = 0;
     for chunk in data_chunks.into_iter() {
-        let data_hash = crypto.hash_sha256(chunk)?;
+        let data_hash = hash_sha256(chunk)?;
         let max_byte_range = min_byte_range + &chunk.len();
         let offset = (max_byte_range as u32).to_note_vec();
-        let id = crypto.hash_all_sha256(vec![&data_hash, &offset])?;
+        let id = hash_all_sha256(vec![&data_hash, &offset])?;
 
         leaves.push(Node {
             id,
@@ -126,9 +127,9 @@ pub fn generate_leaves(data: Vec<u8>, crypto: &Provider) -> Result<Vec<Node>, Er
 }
 
 /// Hashes together a single branch node from a pair of child nodes.
-pub fn hash_branch(left: Node, right: Node, crypto: &Provider) -> Result<Node, Error> {
+pub fn hash_branch(left: Node, right: Node) -> Result<Node, Error> {
     let max_byte_range = (left.max_byte_range as u32).to_note_vec();
-    let id = crypto.hash_all_sha256(vec![&left.id, &right.id, &max_byte_range])?;
+    let id = hash_all_sha256(vec![&left.id, &right.id, &max_byte_range])?;
     Ok(Node {
         id,
         data_hash: None,
@@ -140,12 +141,12 @@ pub fn hash_branch(left: Node, right: Node, crypto: &Provider) -> Result<Node, E
 }
 
 /// Builds one layer of branch nodes from a layer of child nodes.
-pub fn build_layer<'a>(nodes: Vec<Node>, crypto: &Provider) -> Result<Vec<Node>, Error> {
+pub fn build_layer<'a>(nodes: Vec<Node>) -> Result<Vec<Node>, Error> {
     let mut layer = Vec::<Node>::with_capacity(nodes.len() / 2 + (nodes.len() % 2 != 0) as usize);
     let mut nodes_iter = nodes.into_iter();
     while let Some(left) = nodes_iter.next() {
         if let Some(right) = nodes_iter.next() {
-            layer.push(hash_branch(left, right, &crypto).unwrap());
+            layer.push(hash_branch(left, right).unwrap());
         } else {
             layer.push(left);
         }
@@ -154,9 +155,9 @@ pub fn build_layer<'a>(nodes: Vec<Node>, crypto: &Provider) -> Result<Vec<Node>,
 }
 
 /// Builds all layers from leaves up to single root node.
-pub fn generate_data_root(mut nodes: Vec<Node>, crypto: &Provider) -> Result<Node, Error> {
+pub fn generate_data_root(mut nodes: Vec<Node>) -> Result<Node, Error> {
     while nodes.len() > 1 {
-        nodes = build_layer(nodes, &crypto)?;
+        nodes = build_layer(nodes)?;
     }
     let root = nodes.pop().unwrap();
     Ok(root)
@@ -236,7 +237,7 @@ pub fn validate_chunk(
             // Validate branches.
             for branch_proof in branch_proofs.iter() {
                 // Calculate the id from the proof.
-                let id = crypto.hash_all_sha256(vec![
+                let id = hash_all_sha256(vec![
                     &branch_proof.left_id,
                     &branch_proof.right_id,
                     &branch_proof.offset().to_note_vec(),
@@ -256,8 +257,7 @@ pub fn validate_chunk(
             }
 
             // Validate leaf: both id and data_hash are correct.
-            let id =
-                crypto.hash_all_sha256(vec![&data_hash, &(max_byte_range as u32).to_note_vec()])?;
+            let id = hash_all_sha256(vec![&data_hash, &(max_byte_range as u32).to_note_vec()])?;
             if !(id == root_id) & !(data_hash == leaf_proof.data_hash) {
                 return Err(Error::InvalidProof.into());
             }
@@ -267,4 +267,74 @@ pub fn validate_chunk(
         }
     }
     Ok(())
+}
+
+pub fn hash_sha256(message: &[u8]) -> Result<[u8; 32], Error> {
+    let mut context = Context::new(&SHA256);
+    context.update(message);
+    let mut result: [u8; 32] = [0; 32];
+    result.copy_from_slice(context.finish().as_ref());
+    Ok(result)
+}
+
+fn hash_sha384(message: &[u8]) -> Result<[u8; 48], Error> {
+    let mut context = Context::new(&SHA384);
+    context.update(message);
+    let mut result: [u8; 48] = [0; 48];
+    result.copy_from_slice(context.finish().as_ref());
+    Ok(result)
+}
+
+/// Returns a SHA256 hash of the the concatenated SHA256 hashes of a vector of messages.
+pub fn hash_all_sha256(messages: Vec<&[u8]>) -> Result<[u8; 32], Error> {
+    let hash: Vec<u8> = messages
+        .into_iter()
+        .map(|m| hash_sha256(m).unwrap())
+        .into_iter()
+        .flatten()
+        .collect();
+    let hash = hash_sha256(&hash)?;
+    Ok(hash)
+}
+
+/// Returns a SHA384 hash of the the concatenated SHA384 hashes of a vector messages.
+fn hash_all_sha384(messages: Vec<&[u8]>) -> Result<[u8; 48], Error> {
+    let hash: Vec<u8> = messages
+        .into_iter()
+        .map(|m| hash_sha384(m).unwrap())
+        .into_iter()
+        .flatten()
+        .collect();
+    let hash = hash_sha384(&hash)?;
+    Ok(hash)
+}
+
+/// Concatenates two `[u8; 48]` arrays, returning a `[u8; 96]` array.
+fn concat_u8_48(left: [u8; 48], right: [u8; 48]) -> Result<[u8; 96], Error> {
+    let mut iter = left.into_iter().chain(right);
+    let result = [(); 96].map(|_| iter.next().unwrap());
+    Ok(result)
+}
+
+/// Calculates data root of transaction in accordance with implementation in [arweave-js](https://github.com/ArweaveTeam/arweave-js/blob/master/src/common/lib/deepHash.ts).
+/// [`DeepHashItem`] is a recursive Enum that allows the function to be applied to
+/// nested [`Vec<u8>`] of arbitrary depth.
+pub fn deep_hash(deep_hash_item: DeepHashItem) -> Result<[u8; 48], Error> {
+    let hash = match deep_hash_item {
+        DeepHashItem::Blob(blob) => {
+            let blob_tag = format!("blob{}", blob.len());
+            hash_all_sha384(vec![blob_tag.as_bytes(), &blob])?
+        }
+        DeepHashItem::List(list) => {
+            let list_tag = format!("list{}", list.len());
+            let mut hash = hash_sha384(list_tag.as_bytes())?;
+
+            for child in list.into_iter() {
+                let child_hash = deep_hash(child)?;
+                hash = hash_sha384(&concat_u8_48(hash, child_hash)?)?;
+            }
+            hash
+        }
+    };
+    Ok(hash)
 }
