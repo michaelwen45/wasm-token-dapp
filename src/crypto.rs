@@ -1,6 +1,6 @@
 use crate::error::Error;
 use crate::transaction::Base64;
-use jsonwebkey::JsonWebKey;
+// use jsonwebkey::JsonWebKey;
 use ring::{
     digest::{Context, SHA256},
     rand::{self, SecureRandom},
@@ -14,14 +14,14 @@ pub struct Provider {
 }
 
 impl Provider {
-    pub fn from_keypair_string(data: String) -> Result<Provider, Error> {
-        let jwk_parsed: JsonWebKey = data.parse().unwrap();
-        Ok(Self {
-            keypair: signature::RsaKeyPair::from_pkcs8(&jwk_parsed.key.as_ref().to_der())
-                .map_err(|_| Error::InvalidHash)?,
-            sr: rand::SystemRandom::new(),
-        })
-    }
+    // pub fn from_keypair_string(data: String) -> Result<Provider, Error> {
+    //     let jwk_parsed: JsonWebKey = data.parse().unwrap();
+    //     Ok(Self {
+    //         keypair: signature::RsaKeyPair::from_pkcs8(&jwk_parsed.key.as_ref().to_der())
+    //             .map_err(|_| Error::InvalidHash)?,
+    //         sr: rand::SystemRandom::new(),
+    //     })
+    // }
 
     /// Returns the full modulus of the stored keypair. Encoded as a Base64Url String,
     /// represents the associated network address. Also used in the calculation of transaction

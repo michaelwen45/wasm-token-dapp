@@ -1,3 +1,4 @@
+use crate::transaction::Transaction;
 use std::collections::HashMap;
 use sycamore::prelude::*;
 
@@ -9,25 +10,19 @@ impl Default for Count {
     }
 }
 
-pub struct Files(pub HashMap<String, gloo_file::File>);
-
-impl Default for Files {
-    fn default() -> Files {
-        let files: HashMap<String, gloo_file::File> = HashMap::new();
-        Files(files)
-    }
-}
-
-pub type FilesVec = Vec<gloo_file::File>;
+pub type Files = HashMap<String, gloo_file::File>;
+pub type FilesVec = Vec<(String, i32)>;
 
 pub fn initialize_store(ctx: ScopeRef) {
     ctx.provide_context_ref(ctx.create_signal(Count::default()));
-    ctx.provide_context_ref(ctx.create_signal(Files::default()));
+    ctx.provide_context_ref(ctx.create_signal(Files::new()));
     ctx.provide_context_ref(ctx.create_signal(FilesVec::new()));
+    ctx.provide_context_ref(ctx.create_signal(Transaction::default()));
 }
 pub enum Action {
     CountIncrement(i32),
     FilesSet(web_sys::FileList),
+    TransactionSet(Transaction),
 }
 
 pub fn reducer(ctx: ScopeRef, action: Action) {
@@ -41,14 +36,23 @@ pub fn reducer(ctx: ScopeRef, action: Action) {
             let files_vec = ctx.use_context::<Signal<FilesVec>>();
 
             let new_files_vec = gloo_file::FileList::from(file_list).to_vec();
-            log::debug!("{:?}", new_files_vec);
-            files_vec.set(new_files_vec.clone());
 
-            let mut new_files = Files::default();
+            files_vec.set(
+                new_files_vec
+                    .iter()
+                    .map(|f| (f.name(), f.size() as i32))
+                    .collect(),
+            );
+
+            let mut new_files = Files::new();
             new_files_vec.into_iter().for_each(|f| {
-                new_files.0.insert(f.name(), f);
+                new_files.insert(f.name(), f);
             });
             files.set(new_files);
+        }
+        Action::TransactionSet(transaction) => {
+            let tx = ctx.use_context::<Signal<Transaction>>();
+            tx.set(transaction);
         }
     }
 }

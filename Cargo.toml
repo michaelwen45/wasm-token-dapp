@@ -1,5 +1,5 @@
 [package]
-name = "syc-tutorial"
+name = "wasm-token-app"
 version = "0.1.0"
 edition = "2021"
 
@@ -13,7 +13,7 @@ console_error_panic_hook = "0.1.7"
 console_log = "0.2.0"
 getrandom = { version = "0.2.5", features = ["js"] }
 gloo-file = { version = "0.2", features = ["futures"] }
-jsonwebkey = { version = "0.3.4", features = [ "pkcs-convert" ] }
+# jsonwebkey = { version = "0.3.4", features = [ "pkcs-convert" ] }
 log = "0.4.14"
 sycamore = { git = "https://github.com/sycamore-rs/sycamore", rev = "24a1c15830e91a0a0785b48d470ad62f2d13b8b7", features=["suspense"] }
 wasm-bindgen = "0.2.79"
@@ -22,11 +22,12 @@ reqwest = "0.11.9"
 ring = {version = "0.16.20", features = ["wasm32_c"] }
 serde = { version = "1.0.136", features = [] }
 thiserror = "1.0.30"
+sha2 = { version = "0.10" }
+solana-sdk = "1.10.0"
 
 [dependencies.web-sys]
-features = ["Event", "File", "FileReader", "Blob", "Window"]
+features = ["Event", "File", "FileReader", "Blob", "Window", "Performance", "PerformanceTiming"]
 version = "0.3.56"
 
 [dependencies.js-sys]
 version = "0.3.56"
-

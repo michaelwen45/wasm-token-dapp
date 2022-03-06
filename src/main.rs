@@ -5,15 +5,8 @@ mod merkle;
 mod store;
 mod transaction;
 use components::files::FilesSelector;
-use error::Error;
 use store::*;
 use sycamore::prelude::*;
-use transaction::Transaction;
-
-pub async fn create_transaction(file: gloo_file::File) -> Result<Transaction, Error> {
-    let bytes = gloo_file::futures::read_as_bytes(&file).await.unwrap();
-    transaction::merklize(bytes)
-}
 
 #[derive(Prop)]
 struct CounterProps<'a> {
@@ -47,7 +40,7 @@ fn Wallet<'a, G: Html>(ctx: ScopeRef<'a>) -> View<G> {
                         let is_phantom = js_sys::Reflect::get(&*solana, &wasm_bindgen::JsValue::from_str("isPhantom")).unwrap().as_bool().unwrap();
                         let connect: js_sys::Function = js_sys::Reflect::get(&*solana, &wasm_bindgen::JsValue::from_str("connect")).unwrap().into();
                         let res = js_sys::Reflect::apply(&connect, &*solana, &js_sys::Array::new()).unwrap();
-                        log::debug!("{:?}", res);
+                        log::debug!("{:?}", solana);
                      }
             ) {
                 "Connect"
@@ -59,14 +52,13 @@ fn Wallet<'a, G: Html>(ctx: ScopeRef<'a>) -> View<G> {
 #[component]
 fn App<G: Html>(ctx: ScopeRef) -> View<G> {
     let label = ctx.create_signal("count".to_string());
-    // let count = ctx.create_signal(0);
-    // ctx.provide_context_ref(count);
     initialize_store(ctx);
+
     view! { ctx,
-        h1(class="text-xl text-slate-200 font-semibold  p-4") {
-            "WASM Token App"
-        }
-        div(class="mx-auto max-w-2xl space-y-4") {
+        div(class="container mx-auto space-y-4") {
+            h1(class="text-2xl text-slate-200 font-semibold pt-8") {
+                "WASM Token App"
+            }
             Counter {
                 label: label
             }

@@ -1,7 +1,6 @@
 //! Data structures for serializing and deserializing [`Transaction`]s and [`Tag`]s.
 
 use crate::{
-    crypto::Provider,
     error::Error,
     merkle::{generate_data_root, generate_leaves, resolve_proofs, Node, Proof},
 };
@@ -285,24 +284,6 @@ impl DeepHashItem {
     }
     pub fn from_children(children: Vec<DeepHashItem>) -> DeepHashItem {
         Self::List(children)
-    }
-}
-
-/// Not currently in use.
-#[derive(Serialize, Deserialize, Debug, Default, PartialEq)]
-pub struct Uploader {
-    pub chunk_index: usize,
-    pub tx_posted: bool,
-    pub transaction: Transaction,
-    pub last_request_time_end: u64,
-    pub total_errors: u64,
-    pub last_response_status: u64,
-    pub last_response_error: String,
-}
-
-impl Uploader {
-    pub fn is_complete(&self) -> bool {
-        self.tx_posted && self.chunk_index == self.transaction.chunks.len()
     }
 }
 

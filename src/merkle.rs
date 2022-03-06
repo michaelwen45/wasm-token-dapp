@@ -1,8 +1,16 @@
 //! Functionality for chunking file data and calculating and verifying root ids.
 
-use crate::{crypto::Provider, error::Error, transaction::DeepHashItem};
+use crate::{error::Error, transaction::DeepHashItem};
 use borsh::BorshDeserialize;
 use ring::digest::{Context, SHA256, SHA384};
+use sha2::{digest::DynDigest, Sha256};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+fn perf_to_system(amt: f64) -> SystemTime {
+    let secs = (amt as u64) / 1_000;
+    let nanos = (((amt as u64) % 1_000) as u32) * 1_000_000;
+    UNIX_EPOCH + Duration::new(secs, nanos)
+}
 
 /// Single struct used for original data chunks (Leaves) and branch nodes (hashes of pairs of child nodes).
 #[derive(Debug, PartialEq, Clone)]
@@ -105,31 +113,41 @@ pub fn generate_leaves(data: Vec<u8>) -> Result<Vec<Node>, Error> {
         data_chunks.push(&[]);
     }
 
-    let mut leaves = Vec::<Node>::new();
-    let mut min_byte_range = 0;
-    for chunk in data_chunks.into_iter() {
-        let data_hash = hash_sha256(chunk)?;
-        let max_byte_range = min_byte_range + &chunk.len();
-        let offset = (max_byte_range as u32).to_note_vec();
-        let id = hash_all_sha256(vec![&data_hash, &offset])?;
+    let (chunk_ranges, _) =
+        data_chunks
+            .iter()
+            .fold((Vec::new(), 0), |(mut ranges, min_byte_range), chunk| {
+                let max_byte_range = min_byte_range + &chunk.len();
+                ranges.push((min_byte_range, max_byte_range));
+                (ranges, max_byte_range)
+            });
 
-        leaves.push(Node {
-            id,
-            data_hash: Some(data_hash),
-            min_byte_range,
-            max_byte_range,
-            left_child: None,
-            right_child: None,
-        });
-        min_byte_range = min_byte_range + &chunk.len();
-    }
+    let mut context = Sha256::default();
+    let leaves = data_chunks
+        .iter()
+        .zip(chunk_ranges)
+        .map(|(chunk, (min_byte_range, max_byte_range))| {
+            let data_hash = hash_sha256(chunk, &mut context).unwrap();
+            let offset = (max_byte_range as u32).to_note_vec();
+            let id = hash_all_sha256(vec![&data_hash, &offset], &mut context).unwrap();
+
+            Node {
+                id,
+                data_hash: Some(data_hash),
+                min_byte_range,
+                max_byte_range,
+                left_child: None,
+                right_child: None,
+            }
+        })
+        .collect();
     Ok(leaves)
 }
 
 /// Hashes together a single branch node from a pair of child nodes.
-pub fn hash_branch(left: Node, right: Node) -> Result<Node, Error> {
+pub fn hash_branch(left: Node, right: Node, context: &mut dyn DynDigest) -> Result<Node, Error> {
     let max_byte_range = (left.max_byte_range as u32).to_note_vec();
-    let id = hash_all_sha256(vec![&left.id, &right.id, &max_byte_range])?;
+    let id = hash_all_sha256(vec![&left.id, &right.id, &max_byte_range], context)?;
     Ok(Node {
         id,
         data_hash: None,
@@ -141,12 +159,12 @@ pub fn hash_branch(left: Node, right: Node) -> Result<Node, Error> {
 }
 
 /// Builds one layer of branch nodes from a layer of child nodes.
-pub fn build_layer<'a>(nodes: Vec<Node>) -> Result<Vec<Node>, Error> {
+pub fn build_layer<'a>(nodes: Vec<Node>, context: &mut dyn DynDigest) -> Result<Vec<Node>, Error> {
     let mut layer = Vec::<Node>::with_capacity(nodes.len() / 2 + (nodes.len() % 2 != 0) as usize);
     let mut nodes_iter = nodes.into_iter();
     while let Some(left) = nodes_iter.next() {
         if let Some(right) = nodes_iter.next() {
-            layer.push(hash_branch(left, right).unwrap());
+            layer.push(hash_branch(left, right, context).unwrap());
         } else {
             layer.push(left);
         }
@@ -156,8 +174,9 @@ pub fn build_layer<'a>(nodes: Vec<Node>) -> Result<Vec<Node>, Error> {
 
 /// Builds all layers from leaves up to single root node.
 pub fn generate_data_root(mut nodes: Vec<Node>) -> Result<Node, Error> {
+    let mut context = Sha256::default();
     while nodes.len() > 1 {
-        nodes = build_layer(nodes)?;
+        nodes = build_layer(nodes, &mut context)?;
     }
     let root = nodes.pop().unwrap();
     Ok(root)
@@ -213,7 +232,7 @@ pub fn validate_chunk(
     mut root_id: [u8; HASH_SIZE],
     chunk: Node,
     proof: Proof,
-    crypto: &Provider,
+    context: &mut dyn DynDigest,
 ) -> Result<(), Error> {
     match chunk {
         Node {
@@ -237,11 +256,14 @@ pub fn validate_chunk(
             // Validate branches.
             for branch_proof in branch_proofs.iter() {
                 // Calculate the id from the proof.
-                let id = hash_all_sha256(vec![
-                    &branch_proof.left_id,
-                    &branch_proof.right_id,
-                    &branch_proof.offset().to_note_vec(),
-                ])?;
+                let id = hash_all_sha256(
+                    vec![
+                        &branch_proof.left_id,
+                        &branch_proof.right_id,
+                        &branch_proof.offset().to_note_vec(),
+                    ],
+                    context,
+                )?;
 
                 // Ensure calculated id correct.
                 if !(id == root_id) {
@@ -257,7 +279,10 @@ pub fn validate_chunk(
             }
 
             // Validate leaf: both id and data_hash are correct.
-            let id = hash_all_sha256(vec![&data_hash, &(max_byte_range as u32).to_note_vec()])?;
+            let id = hash_all_sha256(
+                vec![&data_hash, &(max_byte_range as u32).to_note_vec()],
+                context,
+            )?;
             if !(id == root_id) & !(data_hash == leaf_proof.data_hash) {
                 return Err(Error::InvalidProof.into());
             }
@@ -269,11 +294,19 @@ pub fn validate_chunk(
     Ok(())
 }
 
-pub fn hash_sha256(message: &[u8]) -> Result<[u8; 32], Error> {
+pub fn hash_sha256_old(message: &[u8]) -> Result<[u8; 32], Error> {
     let mut context = Context::new(&SHA256);
     context.update(message);
     let mut result: [u8; 32] = [0; 32];
     result.copy_from_slice(context.finish().as_ref());
+    Ok(result)
+}
+
+pub fn hash_sha256(message: &[u8], context: &mut dyn DynDigest) -> Result<[u8; 32], Error> {
+    context.update(message);
+    let mut result = [0u8; 32];
+    let hash = context.finalize_reset();
+    result.copy_from_slice(&hash);
     Ok(result)
 }
 
@@ -286,14 +319,17 @@ fn hash_sha384(message: &[u8]) -> Result<[u8; 48], Error> {
 }
 
 /// Returns a SHA256 hash of the the concatenated SHA256 hashes of a vector of messages.
-pub fn hash_all_sha256(messages: Vec<&[u8]>) -> Result<[u8; 32], Error> {
+pub fn hash_all_sha256(
+    messages: Vec<&[u8]>,
+    context: &mut dyn DynDigest,
+) -> Result<[u8; 32], Error> {
     let hash: Vec<u8> = messages
         .into_iter()
-        .map(|m| hash_sha256(m).unwrap())
+        .map(|m| hash_sha256(m, context).unwrap())
         .into_iter()
         .flatten()
         .collect();
-    let hash = hash_sha256(&hash)?;
+    let hash = hash_sha256(&hash, context)?;
     Ok(hash)
 }
 
