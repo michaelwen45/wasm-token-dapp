@@ -26,7 +26,7 @@ jobs:
       - name: Build app
         run: |
           cargo install --locked trunk
-          trunk build --release --public-url
+          trunk build --release --public-url https://calebeverett.github.io/wasm-token-app/
       - name: Deploy to gh-pages
         if: True
         uses: JamesIves/github-pages-deploy-action@v4
