@@ -1739,8 +1739,8 @@ checksum = "6bdef32e8150c2a081110b42772ffe7d7c9032b606bc226c8260fd97e0976601"
 
 [[package]]
 name = "sycamore"
-version = "0.8.0-beta.2"
-source = "git+https://github.com/sycamore-rs/sycamore?rev=24a1c15830e91a0a0785b48d470ad62f2d13b8b7#24a1c15830e91a0a0785b48d470ad62f2d13b8b7"
+version = "0.8.0-beta.3"
+source = "git+https://github.com/CalebEverett/sycamore?branch=master#407971f30d5bcf541d62d012e0931c098627bbdd"
 dependencies = [
  "ahash",
  "futures",
@@ -1757,8 +1757,8 @@ dependencies = [
 
 [[package]]
 name = "sycamore-futures"
-version = "0.8.0-beta.2"
-source = "git+https://github.com/sycamore-rs/sycamore?rev=24a1c15830e91a0a0785b48d470ad62f2d13b8b7#24a1c15830e91a0a0785b48d470ad62f2d13b8b7"
+version = "0.8.0-beta.3"
+source = "git+https://github.com/CalebEverett/sycamore?branch=master#407971f30d5bcf541d62d012e0931c098627bbdd"
 dependencies = [
  "futures",
  "sycamore-reactive",
@@ -1768,8 +1768,8 @@ dependencies = [
 
 [[package]]
 name = "sycamore-macro"
-version = "0.8.0-beta.2"
-source = "git+https://github.com/sycamore-rs/sycamore?rev=24a1c15830e91a0a0785b48d470ad62f2d13b8b7#24a1c15830e91a0a0785b48d470ad62f2d13b8b7"
+version = "0.8.0-beta.3"
+source = "git+https://github.com/CalebEverett/sycamore?branch=master#407971f30d5bcf541d62d012e0931c098627bbdd"
 dependencies = [
  "once_cell",
  "proc-macro2",
@@ -1779,8 +1779,8 @@ dependencies = [
 
 [[package]]
 name = "sycamore-reactive"
-version = "0.8.0-beta.2"
-source = "git+https://github.com/sycamore-rs/sycamore?rev=24a1c15830e91a0a0785b48d470ad62f2d13b8b7#24a1c15830e91a0a0785b48d470ad62f2d13b8b7"
+version = "0.8.0-beta.3"
+source = "git+https://github.com/CalebEverett/sycamore?branch=master#407971f30d5bcf541d62d012e0931c098627bbdd"
 dependencies = [
  "indexmap",
  "slotmap",

@@ -1,6 +1,6 @@
 use crate::store::{reducer, Action, Files, FilesVec};
 use crate::transaction::{merklize, ToItems, Transaction};
-use sycamore::futures::ScopeSpawnFuture;
+use sycamore::futures::ScopeSpawnLocal;
 use sycamore::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::{Event, HtmlInputElement};
@@ -14,7 +14,7 @@ pub fn handle_click(ctx: ScopeRef<'_>, name: String) {
     let files = ctx.use_context::<Signal<Files>>();
     let file = files.get().get(&name).unwrap().clone();
     log::debug!("{:?} start", &name);
-    ctx.spawn_future(async move {
+    ctx.spawn_local(async move {
         let tx = create_transaction(file).await.unwrap();
         reducer(ctx, Action::TransactionSet(tx));
         log::debug!("{:?} done", &name)
