@@ -14,6 +14,7 @@ npm install
 cargo install --locked trunk
 cargo trunk serve --release
 ```
+See output in console.
 
 ### Parking Lot
 * [wasm-bindgen-rayon](https://docs.rs/crate/wasm-bindgen-rayon/latest)
