@@ -22,8 +22,8 @@ jobs:
         with:
           toolchain: nightly
       - run: |
-        cargo install --locked trunk
-        trunk build --release
+          cargo install --locked trunk
+          trunk build --release
       - name: Deploy dist to gh-pages
         if: True
         uses: JamesIves/github-pages-deploy-action@v4
