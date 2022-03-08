@@ -23,10 +23,11 @@ ring = {version = "0.16.20", features = ["wasm32_c"] }
 serde = { version = "1.0.136", features = [] }
 thiserror = "1.0.30"
 sha2 = { version = "0.10" }
-solana-sdk = "1.10.0"
+solana-sdk = { git = "https://github.com/CalebEverett/solana.git", branch = "master"}
+serde-wasm-bindgen = "0.4.2"
 
 [dependencies.web-sys]
-features = ["Event", "File", "FileReader", "Blob", "Window", "Performance", "PerformanceTiming"]
+features = ["Event", "File", "FileReader", "Blob", "Window", "Performance", "PerformanceTiming", "EventTarget", "MessageEvent"]
 version = "0.3.56"
 
 [dependencies.js-sys]

@@ -1440,6 +1440,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde-wasm-bindgen"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d5d0927d4115e78b52dfd4cabcb3cc79bd56b94a53cf27c074bf8b83af1765d1"
+dependencies = [
+ "fnv",
+ "js-sys",
+ "serde",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "serde_bytes"
 version = "0.11.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1555,9 +1567,8 @@ dependencies = [
 
 [[package]]
 name = "solana-frozen-abi"
-version = "1.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f704637b29f1d58b819601efede8eff0998ec10381cb96796dacfe4cfea5581"
+version = "1.10.1"
+source = "git+https://github.com/CalebEverett/solana.git?branch=master#47b6fbb5628b5810da0900107481ac80e58d4640"
 dependencies = [
  "bs58",
  "bv",
@@ -1574,9 +1585,8 @@ dependencies = [
 
 [[package]]
 name = "solana-frozen-abi-macro"
-version = "1.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96bf045e938c042c59739ba3a77bf1d25cb7cf073bbf3690cc2d56c7cff27ba2"
+version = "1.10.1"
+source = "git+https://github.com/CalebEverett/solana.git?branch=master#47b6fbb5628b5810da0900107481ac80e58d4640"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1586,9 +1596,8 @@ dependencies = [
 
 [[package]]
 name = "solana-logger"
-version = "1.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d97a6f07b5068fdd761b4c5c4ddc1d6cdf5e234abc8f7ed0bf38b46fa4b1eba"
+version = "1.10.1"
+source = "git+https://github.com/CalebEverett/solana.git?branch=master#47b6fbb5628b5810da0900107481ac80e58d4640"
 dependencies = [
  "env_logger",
  "lazy_static",
@@ -1597,9 +1606,8 @@ dependencies = [
 
 [[package]]
 name = "solana-program"
-version = "1.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "888f50c71dc45a528cb63df960e657601fe6fa3d643159d93ebff1dd1cc00b63"
+version = "1.10.1"
+source = "git+https://github.com/CalebEverett/solana.git?branch=master#47b6fbb5628b5810da0900107481ac80e58d4640"
 dependencies = [
  "base64 0.13.0",
  "bincode",
@@ -1639,9 +1647,8 @@ dependencies = [
 
 [[package]]
 name = "solana-sdk"
-version = "1.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd094e3c7213be0cf9b8e4452705a826f78591aaa1e33be93d9ecfc19e69aa15"
+version = "1.10.1"
+source = "git+https://github.com/CalebEverett/solana.git?branch=master#47b6fbb5628b5810da0900107481ac80e58d4640"
 dependencies = [
  "assert_matches",
  "base64 0.13.0",
@@ -1690,9 +1697,8 @@ dependencies = [
 
 [[package]]
 name = "solana-sdk-macro"
-version = "1.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2388e9b1690e83413393f3e20d98551cbebae9d9385397600d25ae9992873736"
+version = "1.10.1"
+source = "git+https://github.com/CalebEverett/solana.git?branch=master#47b6fbb5628b5810da0900107481ac80e58d4640"
 dependencies = [
  "bs58",
  "proc-macro2",
@@ -2140,6 +2146,7 @@ dependencies = [
  "reqwest",
  "ring",
  "serde",
+ "serde-wasm-bindgen",
  "sha2 0.10.2",
  "solana-sdk",
  "sycamore",
