@@ -26,7 +26,7 @@ jobs:
         run: |
           rustup target add wasm32-unknown-unknown
           cargo install --locked trunk
-          trunk build --release
+          trunk build --release --public-url wasm-token-app
       - name: Deploy to gh-pages
         if: True
         uses: JamesIves/github-pages-deploy-action@v4
