@@ -12,20 +12,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Install tailwind deps
+      - name: Install Node
         uses: actions/setup-node@v2
         with:
           node-version: '16'
-      - run: npm install
-      - name: Install Rust toolchain and build
+      - name: Install tailwindcss deps
+        run: npm install
+      - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly
-      - run: |
-          rustup target add wasm32-unknown-unknown
+          target: wasm32-unknown-unknown
+      - name: Build app
+        run: |
           cargo install --locked trunk
-          trunk build --release
-      - name: Deploy dist to gh-pages
+          trunk build --release --public-url
+      - name: Deploy to gh-pages
         if: True
         uses: JamesIves/github-pages-deploy-action@v4
         with:
