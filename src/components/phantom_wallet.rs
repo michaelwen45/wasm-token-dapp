@@ -168,30 +168,30 @@ pub fn Wallet<G: Html>(ctx: ScopeRef) -> View<G> {
             let wallet = wallet_sig.get().pubkey().unwrap();
             wallet_sig.set(wallet);
          }}) {
-            button(class="px-5 py-3 rounded-lg shadow-lg bg-indigo-700 hover:bg-indigo-600 active:bg-indigo-800
-                        focus:outline-none text-sm text-slate-200 uppercase tracking-wider
-                        font-semibold sm:text-base",
-                    on:click={|_| {
-                        // HACK: not sure why we have to call connect twice to get wallet to show up as connected
-                        #[allow(unused_assignments)]
-                        let mut wallet = PhantomWallet::connect().unwrap();
-                        wallet = PhantomWallet::connect().unwrap();
-                        reducer(ctx, Action::WalletSet(wallet));
-                     }
-            }) {
-                "Connect"
-            }
-
-            button(class="px-5 py-3 rounded-lg shadow-lg bg-indigo-700 hover:bg-indigo-600 active:bg-indigo-800
-                        focus:outline-none text-sm text-slate-200 uppercase tracking-wider
-                        font-semibold sm:text-base",
-                    on:click=|_| {
-                        let wallet = wallet_sig.get().disconnect().unwrap();
-                        wallet_sig.set(wallet);
-                     }
-            ) {
-                "Disconnect"
-            }
+             (if wallet_sig.get().is_connected {
+                view! {ctx, button(class="px-5 py-3 rounded-lg shadow-lg bg-indigo-700 hover:bg-indigo-600 active:bg-indigo-800
+                            focus:outline-none text-sm text-slate-200 uppercase tracking-wider
+                            font-semibold sm:text-base",
+                        on:click=|_| {
+                            let wallet = wallet_sig.get().disconnect().unwrap();
+                            wallet_sig.set(wallet);
+                        }
+                    ) {"Disconnect"}
+                }
+             } else {
+                view! {ctx, button(class="px-5 py-3 rounded-lg shadow-lg bg-indigo-700 hover:bg-indigo-600 active:bg-indigo-800
+                            focus:outline-none text-sm text-slate-200 uppercase tracking-wider
+                            font-semibold sm:text-base",
+                        on:click={|_| {
+                            // HACK: not sure why we have to call connect twice to get wallet to show up as connected
+                            #[allow(unused_assignments)]
+                            let mut wallet = PhantomWallet::connect().unwrap();
+                            wallet = PhantomWallet::connect().unwrap();
+                            reducer(ctx, Action::WalletSet(wallet));
+                        }
+                }) {"Connect"}
+                }
+             })
         }
     }
 }
