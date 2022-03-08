@@ -16,14 +16,14 @@ jobs:
         uses: actions/setup-node@v2
         with:
           node-version: '16'
-        run: npm install
+      - run: npm install
       - name: Install Rust toolchain and build
         uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly
-        run: |
-          cargo install --locked trunk
-          trunk build --release
+      - run: |
+        cargo install --locked trunk
+        trunk build --release
       - name: Deploy dist to gh-pages
         if: True
         uses: JamesIves/github-pages-deploy-action@v4
