@@ -29,10 +29,11 @@ pub struct PhantomResponse {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub enum PhantomMethod {
+#[serde(tag = "method")]
+pub enum PhantomRequest {
     Connect,
-    Disconnect,
-    SignAndSendTransaction,
+    SignTransaction { params: PhantomMethodParams },
+    SignAndSendTransaction { params: PhantomMethodParams },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -40,12 +41,12 @@ pub struct PhantomMethodParams {
     message: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PhantomRequest {
-    method: PhantomMethod,
-    params: Option<PhantomMethodParams>,
-}
+// #[derive(Debug, Serialize, Deserialize)]
+// #[serde(rename_all = "camelCase")]
+// pub struct PhantomParams {
+//     method: PhantomMethod,
+//     params: Option<PhantomMethodParams>,
+// }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum PhantomStatus {
@@ -73,6 +74,18 @@ impl PhantomWallet {
     async fn request(request: PhantomRequest) -> Result<JsValue, Error> {
         let window = web_sys::window().unwrap();
         if let Some(solana) = window.get("solana") {
+            let handle_message_str = wasm_bindgen::JsValue::from_str("_handleMessage");
+            let handle_message_method: js_sys::Function =
+                js_sys::Reflect::get(&*solana, &handle_message_str)
+                    .unwrap()
+                    .into();
+
+            window
+                .remove_event_listener_with_callback("message", &handle_message_method)
+                .unwrap();
+            window
+                .add_event_listener_with_callback("message", &handle_message_method)
+                .unwrap();
             let is_phantom =
                 js_sys::Reflect::get(&*solana, &wasm_bindgen::JsValue::from_str("isPhantom"))
                     .unwrap();
@@ -84,25 +97,11 @@ impl PhantomWallet {
                 log::debug!("{:?}", request_method.to_string());
                 let value = serde_wasm_bindgen::to_value(&request).unwrap();
 
-                // let is_connected_str = wasm_bindgen::JsValue::from_str("isConnected");
-                // let is_connected = js_sys::Reflect::get(&solana, &is_connected_str)
-                //     .unwrap()
-                //     .as_bool()
-                //     .unwrap();
-                // log::debug!("is_connected: {:?}", is_connected);
-
                 let resp = request_method.call1(&solana, &value).unwrap();
                 let promise = js_sys::Promise::resolve(&resp);
                 let result = wasm_bindgen_futures::JsFuture::from(promise).await.unwrap();
                 log::debug!("fu {:?}", result);
 
-                // wasm_bindgen_futures::spawn_local(async move {
-                //     let promise = js_sys::Promise::reject(&resp);
-                //     let result = wasm_bindgen_futures::JsFuture::from(promise)
-                //         .await
-                //         .unwrap_err();
-                //     log::debug!("fu {:?}", result);
-                // });
                 Ok(result)
             } else {
                 Err(Error::PhantomWalletNotFound)
@@ -112,8 +111,10 @@ impl PhantomWallet {
         }
     }
 
-    pub fn connect(&self, ctx: ScopeRef<'_>) -> Result<(), Error> {
-        match self.status {
+    pub fn connect(ctx: ScopeRef<'_>) -> Result<(), Error> {
+        let wallet_signal = ctx.use_context::<Signal<PhantomWallet>>();
+        let wallet = wallet_signal.get();
+        match wallet.status {
             PhantomStatus::Disconnected => {
                 let window = web_sys::window().unwrap();
                 if let Some(solana) = window.get("solana") {
@@ -147,6 +148,7 @@ impl PhantomWallet {
                             let pubkey = to_string_fn.call0(&pubkey_obj).unwrap();
                             let public_key =
                                 Pubkey::from_str(&pubkey.as_string().unwrap()).unwrap();
+                            PhantomWallet::is_connected();
                             reducer(
                                 ctx,
                                 Action::WalletSet(PhantomWallet {
@@ -167,7 +169,7 @@ impl PhantomWallet {
             _ => Ok(()),
         }
     }
-    fn disconnect(&self, ctx: ScopeRef<'_>) -> Result<(), Error> {
+    fn disconnect(ctx: ScopeRef<'_>) -> Result<(), Error> {
         let window = web_sys::window().unwrap();
         if let Some(solana) = window.get("solana") {
             let this = JsValue::null();
@@ -179,17 +181,26 @@ impl PhantomWallet {
             ctx.spawn_local(async move {
                 let promise = js_sys::Promise::resolve(&resp);
                 wasm_bindgen_futures::JsFuture::from(promise).await.unwrap();
-                let is_connected_str = wasm_bindgen::JsValue::from_str("isConnected");
-                let is_connected = js_sys::Reflect::get(&solana, &is_connected_str)
-                    .unwrap()
-                    .as_bool()
-                    .unwrap();
-                log::debug!("is_connected: {:?}", is_connected);
+                PhantomWallet::is_connected();
                 reducer(ctx, Action::WalletSet(PhantomWallet::default()))
             });
             Ok(())
         } else {
             Err(Error::PhantomWalletNotFound)
+        }
+    }
+    fn is_connected() -> bool {
+        let window = web_sys::window().unwrap();
+        if let Some(solana) = window.get("solana") {
+            let is_connected_str = wasm_bindgen::JsValue::from_str("isConnected");
+            let is_connected = js_sys::Reflect::get(&solana, &is_connected_str)
+                .unwrap()
+                .as_bool()
+                .unwrap();
+            log::debug!("is_connected: {:?}", is_connected);
+            is_connected
+        } else {
+            false
         }
     }
     fn pubkey(&self) -> Result<PhantomWallet, Error> {
@@ -229,7 +240,57 @@ impl PhantomWallet {
         })
     }
 
-    pub async fn sign_transaction(transaction: Transaction) {}
+    pub fn sign_transaction_method() -> Result<(), Error> {
+        let window = web_sys::window().unwrap();
+        if let Some(solana) = window.get("solana") {
+            let this = JsValue::null();
+            let sign_trans_str = wasm_bindgen::JsValue::from_str("signTransaction");
+            let sign_trans_method: js_sys::Function =
+                js_sys::Reflect::get(&*solana, &sign_trans_str)
+                    .unwrap()
+                    .into();
+            // let resp = sign_trans.call0(&this).unwrap();
+            log::debug!("sign_trans_method{:?}", sign_trans_method.to_string());
+            log::debug!(
+                "sign_transaction: {:?}",
+                js_sys::Object::get_own_property_names(&solana)
+            );
+            Ok(())
+        } else {
+            Err(Error::PhantomWalletNotFound)
+        }
+    }
+    pub fn sign_transaction(ctx: ScopeRef<'_>, transaction: Transaction) -> Result<(), Error> {
+        let wallet_signal = ctx.use_context::<Signal<PhantomWallet>>();
+        let wallet = wallet_signal.get();
+        if wallet.status == PhantomStatus::Disconnected {
+            let params = PhantomRequest::SignTransaction {
+                params: PhantomMethodParams {
+                    message: "dingus".to_string(),
+                },
+            };
+        } else {
+        }
+        Ok(())
+    }
+
+    pub fn create_transfer_transaction(
+        ctx: ScopeRef<'_>,
+        to: &Pubkey,
+        lamports: u64,
+    ) -> Result<(), Error> {
+        let wallet_signal = ctx.use_context::<Signal<PhantomWallet>>();
+        let wallet = wallet_signal.get();
+        if wallet.status == PhantomStatus::Disconnected {
+            let params = PhantomRequest::SignTransaction {
+                params: PhantomMethodParams {
+                    message: "dingus".to_string(),
+                },
+            };
+        } else {
+        }
+        Ok(())
+    }
 }
 
 #[component]
@@ -279,7 +340,7 @@ pub fn Wallet<G: Html>(ctx: ScopeRef) -> View<G> {
     //     .unwrap();
     // a.forget();
 
-    let wallet_sig = ctx.use_context::<Signal<PhantomWallet>>();
+    let wallet_signal = ctx.use_context::<Signal<PhantomWallet>>();
 
     view! {ctx, div(id="message-target",
         // on:connect={|event: web_sys::Event| {
@@ -288,51 +349,42 @@ pub fn Wallet<G: Html>(ctx: ScopeRef) -> View<G> {
         //     wallet_sig.set(wallet);
         //  }}
         ) {
-             (if wallet_sig.get().status == PhantomStatus::Connected {
-                view! {ctx, button(class="px-5 py-3 rounded-lg shadow-lg bg-indigo-700 hover:bg-indigo-600 active:bg-indigo-800
-                            focus:outline-none text-sm text-slate-200 uppercase tracking-wider
-                            font-semibold sm:text-base",
-                        on:click=|_| {
-                            let wallet = wallet_sig.get();
-                            wallet.disconnect(ctx).unwrap();
-                        }
-                    ) {"Disconnect"}
+            button(class="px-5 py-3 rounded-lg shadow-lg bg-indigo-700 hover:bg-indigo-600 active:bg-indigo-800
+                focus:outline-none text-sm text-slate-200 uppercase tracking-wider
+                font-semibold sm:text-base",
+                on:click=|_| {
+                    if wallet_signal.get().status == PhantomStatus::Connected {
+                        PhantomWallet::disconnect(ctx).unwrap();
+                    } else { PhantomWallet::connect(ctx).unwrap(); }
                 }
-             } else {
-                view! {ctx, button(class="px-5 py-3 rounded-lg shadow-lg bg-indigo-700 hover:bg-indigo-600 active:bg-indigo-800
-                            focus:outline-none text-sm text-slate-200 uppercase tracking-wider
-                            font-semibold sm:text-base",
-                        on:click={|_| {
-                            // HACK: not sure why we have to call connect twice to get wallet to show up as connected
-                            #[allow(unused_assignments)]
-                            let wallet = wallet_sig.get();
-                            wallet.connect(ctx).unwrap()
-
-                            // let request = PhantomRequest {
-                            //     method: PhantomWalletMethod::Connect,
-                            //     params: None,
-                            // };
-                            // ctx.spawn_local(async move {
-                            //     PhantomWallet::request(request).await.unwrap();
-                            // })
-
-
-                            // let request = PhantomRequest {
-                            // method: PhantomWalletMethod::Connect,
-                            // params: None,
-                            // };
-                            // ctx.spawn_local(async move {
-                            //     let result = PhantomWallet::request(request).await.unwrap();
-                            //     log::debug!("{:?}", result);
-                            // })
-
-                            // let _ = PhantomWallet::connect().unwrap();
-                            // let wallet = PhantomWallet::connect().unwrap();
-                            // reducer(ctx, Action::WalletSet(wallet));
-                        }
-                }) {"Connect"}
+            ) {
+                (if wallet_signal.get().status == PhantomStatus::Connected {
+                    "Disconnect"
+                } else {
+                    "Connect"
+                })
+            }
+            button(class="px-5 py-3 rounded-lg shadow-lg bg-indigo-700 hover:bg-indigo-600 active:bg-indigo-800
+                focus:outline-none text-sm text-slate-200 uppercase tracking-wider
+                font-semibold sm:text-base",
+                on:click=|_| {
+                    // PhantomWallet::sign_transaction(ctx, ).unwrap();
                 }
-             })
+            ) {
+                "Sign Transaction"
+            }
+            button(class="px-5 py-3 rounded-lg shadow-lg bg-indigo-700 hover:bg-indigo-600 active:bg-indigo-800
+                focus:outline-none text-sm text-slate-200 uppercase tracking-wider
+                font-semibold sm:text-base",
+                on:click=|_| {
+                    ctx.spawn_local(async move {
+                        PhantomWallet::request(PhantomRequest::Connect).await.unwrap();
+                    })
+
+                }
+            ) {
+                "Request"
+            }
         }
     }
 }
