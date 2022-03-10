@@ -56,6 +56,8 @@ pub enum Error {
     PhantomWalletNotFound,
     #[error("reqwest: {0}")]
     Reqwest(#[from] reqwest::Error),
+    #[error("future error")]
+    JsFutureError,
     // #[error("ring unspecified: {0}")]
     // RingUnspecified(#[from] Unspecified),
     // #[error("serde json: {0}")]
